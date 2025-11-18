@@ -1001,112 +1001,154 @@ pyodide.FS.writeFile('/data.xlsx', excelData);
                 outputDiv.style.color = '#4ec9b0';
                 
                 // 정답 확인
-                checkAnswer(output.trim());
-                
-            } catch (error) {
-                outputDiv.textContent = `❌ 오류:\n${error.message}`;
-                outputDiv.style.color = '#ff6b6b';
-                
-                const feedback = document.getElementById('feedback');
-                feedback.textContent = '❌ 코드 실행 중 오류가 발생했습니다. 문법을 확인해주세요!';
-                feedback.className = 'feedback error show';
-            } finally {
-                runBtn.disabled = false;
-                runBtn.textContent = '▶️ 실행 및 정답 확인';
-            }
-        }
-
-        // 정답 확인
+        // ===============================
+        //  ✔ 최종 완성된 checkAnswer() 및 보조 함수들
+        // ===============================
         function checkAnswer(actualOutput) {            
+
             const topic = gameState.currentTopic;
             const qIndex = gameState.currentQuestion;
             const q = questions[topic][qIndex];
-            
+
             const expectedOutput = q.expectedOutput.trim();
-            
-            let points = 100;
-            if (q.difficulty === 'medium') points = 150;
-            if (q.difficulty === 'hard') points = 200;
-            
             const feedback = document.getElementById('feedback');
             const expectedOutputDiv = document.getElementById('expected-output');
-            
-            // 출력 비교 (공백 정규화)
-            const normalizedActual = actualOutput.replace(/\s+/g, ' ').trim();
-            const normalizedExpected = expectedOutput.replace(/\s+/g, ' ').trim();
-            
-            // 정답 판정
-function checkAnswer(actualOutput) {            
-    const topic = gameState.currentTopic;
-    const qIndex = gameState.currentQuestion;
-    const q = questions[topic][qIndex];
 
-    const expectedOutput = q.expectedOutput.trim();
-    const feedback = document.getElementById('feedback');
-    const expectedOutputDiv = document.getElementById('expected-output');
+            // =====================================================================
+            // 1) 데이터 불러오기(data_loading) → 실행만 성공하면 정답 처리
+            // =====================================================================
+            if (topic === 'data_loading') {
 
-    // ✅ 데이터 불러오기(data_loading)는 실행 성공 = 정답 처리
-    if (topic === 'data_loading') {
-        let points = (q.difficulty === 'easy') ? 100 : (q.difficulty === 'medium' ? 150 : 200);
+                let points = (q.difficulty === 'easy') ? 100 :
+                             (q.difficulty === 'medium' ? 150 : 200);
 
-        gameState.score += points;
-        gameState.solved++;
-        gameState.streak++;
-
-        if (gameState.score >= gameState.level * 500) {
-            gameState.level++;
-        }
-
-        feedback.textContent = `✅ (데이터 불러오기 문제) 코드가 정상 실행되었습니다! +${points}점`;
-        feedback.className = 'feedback success show';
-
-        expectedOutputDiv.textContent = `실행 성공했으므로 정답 처리되었습니다.`;
-        expectedOutputDiv.style.color = '#4ec9b0';
-
-        updateStats();
-        saveProgressToFirebase();
-
-        setTimeout(nextQuestion, 3000);
-        return; // 🔥 기존 정답 비교 로직 실행하지 않도록 종료
-    }
-            const isCorrect = normalizedActual === normalizedExpected || 
-                              actualOutput === expectedOutput ||
-                              // 부분 일치도 허용 (난수 등)
-                              (q.difficulty === 'medium' && normalizedActual.includes(normalizedExpected.substring(0, 10)));
-            
-            if (isCorrect) {
                 gameState.score += points;
                 gameState.solved++;
                 gameState.streak++;
-                
+
                 if (gameState.score >= gameState.level * 500) {
                     gameState.level++;
                 }
-                
-                feedback.textContent = `✅ 정답입니다! +${points}점 (연속 ${gameState.streak}문제)`;
+
+                feedback.textContent = `✅ (데이터 불러오기) 코드가 정상 실행되었습니다! +${points}점`;
                 feedback.className = 'feedback success show';
-                expectedOutputDiv.textContent = `예상 출력:\n${expectedOutput}`;
+
+                expectedOutputDiv.textContent = `실행 성공했으므로 정답 처리되었습니다.`;
                 expectedOutputDiv.style.color = '#4ec9b0';
-                
+
                 updateStats();
                 saveProgressToFirebase();
 
-                setTimeout(nextQuestion,3000);
-                                
-            } else {
-                // 오답인 경우 즉시 재활성화
-                
-                gameState.streak = 0;
-                
-                feedback.textContent = `❌ 출력 결과가 다릅니다!\n\n실제 출력과 예상 출력을 비교해보세요.`;
+                setTimeout(nextQuestion, 2500);
+                return;   // 다른 판정 로직은 실행하지 않음
+            }
+
+            // =====================================================================
+            // 2) 데이터 불러오기 외 영역은 예상 출력과 비교
+            // =====================================================================
+            if (!actualOutput) {
+                feedback.textContent = "⚠️ 출력이 감지되지 않았습니다.";
                 feedback.className = 'feedback error show';
+                expectedOutputDiv.textContent = `예상 출력: ${expectedOutput}`;
+                expectedOutputDiv.style.color = '#e06c75';
+                return;
+            }
+
+            const cleanedActual = actualOutput.trim();
+
+            // 정확히 일치?
+            if (cleanedActual === expectedOutput) {
+                handleCorrectAnswer(q, feedback, expectedOutputDiv);
+                return;
+            }
+
+            // 유사도 검사 (90% 이상은 정답 처리)
+            const similarity = stringSimilarity(cleanedActual, expectedOutput);
+
+            if (similarity >= 0.9) {
+                handleCorrectAnswer(q, feedback, expectedOutputDiv, true);
+            } else {
+                feedback.textContent = "❌ 오답입니다.";
+                feedback.className = 'feedback error show';
+
                 expectedOutputDiv.textContent = `예상 출력:\n${expectedOutput}`;
-                expectedOutputDiv.style.color = '#ff6b6b';
-                
-                updateStats();
+                expectedOutputDiv.style.color = '#e06c75';
             }
         }
 
+        // 공통: 정답 처리 로직
+        function handleCorrectAnswer(q, feedback, expectedOutputDiv, isSimilar=false) {
+
+            let points = (q.difficulty === 'easy') ? 100 :
+                         (q.difficulty === 'medium' ? 150 : 200);
+
+            gameState.score += points;
+            gameState.solved++;
+            gameState.streak++;
+
+            if (gameState.score >= gameState.level * 500) {
+                gameState.level++;
+            }
+
+            feedback.textContent = isSimilar
+                ? `🟡 거의 정답입니다! +${points}점`
+                : `✅ 정답입니다! +${points}점`;
+
+            feedback.className = 'feedback success show';
+
+            expectedOutputDiv.textContent = "정답 처리되었습니다.";
+            expectedOutputDiv.style.color = '#4ec9b0';
+
+            updateStats();
+            saveProgressToFirebase();
+
+            setTimeout(nextQuestion, 2500);
+        }
+
+        // 문자열 유사도 계산 함수
+        function stringSimilarity(a, b) {
+            if (!a || !b) return 0;
+
+            const longer = a.length > b.length ? a : b;
+            const shorter = a.length > b.length ? b : a;
+
+            const longerLength = longer.length;
+            if (longerLength === 0) return 1.0;
+
+            const same = longerLength - editDistance(longer, shorter);
+            return same / longerLength;
+        }
+
+        function editDistance(s1, s2) {
+            s1 = s1.toLowerCase();
+            s2 = s2.toLowerCase();
+
+            const costs = [];
+
+            for (let i = 0; i <= s1.length; i++) {
+                let lastValue = i;
+
+                for (let j = 0; j <= s2.length; j++) {
+                    if (i === 0)
+                        costs[j] = j;
+                    else if (j > 0) {
+
+                        let newValue = costs[j - 1];
+                        if (s1.charAt(i - 1) !== s2.charAt(j - 1))
+                            newValue = Math.min(Math.min(newValue, lastValue),
+                                costs[j]) + 1;
+
+                        costs[j - 1] = lastValue;
+                        lastValue = newValue;
+                    }
+                }
+
+                if (i > 0)
+                    costs[s2.length] = lastValue;
+            }
+
+            return costs[s2.length];
+        }
         // 통계 업데이트
         function updateStats() {
             document.getElementById('score').textContent = gameState.score;
