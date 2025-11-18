@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔥 Firebase Database 초기화 도구</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .warning h3 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+
+        .warning p {
+            color: #856404;
+            line-height: 1.6;
+        }
+
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: scale(1.02);
+            box-shadow: 0 5px 15px rgba(245, 87, 108, 0.4);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            transform: scale(1.02);
+            box-shadow: 0 5px 15px rgba(255, 152, 0, 0.4);
+        }
+
+        .btn-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-info:hover {
+            transform: scale(1.02);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .log {
+            margin-top: 20px;
+            padding: 15px;
+            background: #1e1e1e;
+            color: #4ec9b0;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            margin: 5px 0;
+        }
+
+        .log-success {
+            color: #4ec9b0;
+        }
+
+        .log-error {
+            color: #ff6b6b;
+        }
+
+        .log-info {
+            color: #61afef;
+        }
+
+        .checkbox-container {
+            margin: 15px 0;
+        }
+
+        .checkbox-container label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-size: 1.1em;
+        }
+
+        .checkbox-container input[type="checkbox"] {
+            width: 24px;
+            height: 24px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔥 Firebase Database 초기화</h1>
+        <p style="color: #666; margin-bottom: 20px;">Python Learning System 데이터베이스 관리</p>
+
+        <div class="warning">
+            <h3>⚠️ 주의사항</h3>
+            <p>
+                삭제된 데이터는 <strong>복구할 수 없습니다!</strong><br>
+                신중하게 선택하시고, 중요한 데이터는 먼저 백업하세요.
+            </p>
+        </div>
+
+        <div class="section">
+            <h2>📊 현재 데이터 확인</h2>
+            <button class="btn-info" onclick="checkData()">데이터 확인하기</button>
+        </div>
+
+        <div class="section">
+            <h2>🗑️ 선택적 삭제</h2>
+            
+            <div class="checkbox-container">
+                <label>
+                    <input type="checkbox" id="confirm-delete">
+                    <span>위 주의사항을 읽었으며, 삭제할 준비가 되었습니다</span>
+                </label>
+            </div>
+
+            <button class="btn-warning" onclick="deleteStudents()" id="btn-students" disabled>
+                학생 데이터 삭제 (students/)
+            </button>
+            <button class="btn-warning" onclick="deleteQuestions()" id="btn-questions" disabled>
+                문제 데이터 삭제 (questions/)
+            </button>
+            <button class="btn-danger" onclick="deleteAll()" id="btn-all" disabled>
+                ⚠️ 전체 데이터 삭제
+            </button>
+        </div>
+
+        <div class="log" id="log">
+            <div class="log-entry log-info">🔷 데이터베이스 초기화 도구 준비 완료</div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+    <script>
+        // Firebase 설정
+        const firebaseConfig = {
+            apiKey: "AIzaSyBHOBXMqpBDsDIMONQqWZ83qxIxhU0VyG8",
+            authDomain: "python-learning-system.firebaseapp.com",
+            databaseURL: "https://python-learning-system-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "python-learning-system",
+            storageBucket: "python-learning-system.firebasestorage.app",
+            messagingSenderId: "844754646343",
+            appId: "1:844754646343:web:da76658dae2e91d6468862"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // 로그 추가 함수
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // 체크박스 상태 확인
+        document.getElementById('confirm-delete').addEventListener('change', function() {
+            const buttons = ['btn-students', 'btn-questions', 'btn-all'];
+            buttons.forEach(btnId => {
+                document.getElementById(btnId).disabled = !this.checked;
+            });
+        });
+
+        // 데이터 확인
+        async function checkData() {
+            addLog('🔍 데이터베이스 확인 중...', 'info');
+            
+            try {
+                const snapshot = await database.ref('/').once('value');
+                const data = snapshot.val();
+                
+                if (!data) {
+                    addLog('📭 데이터베이스가 비어있습니다', 'success');
+                    return;
+                }
+
+                // students 확인
+                if (data.students) {
+                    const studentCount = Object.keys(data.students).length;
+                    addLog(`👥 학생 데이터: ${studentCount}명`, 'info');
+                } else {
+                    addLog('👥 학생 데이터: 없음', 'info');
+                }
+
+                // questions 확인
+                if (data.questions) {
+                    let totalQuestions = 0;
+                    for (let category in data.questions) {
+                        const count = Object.keys(data.questions[category]).length;
+                        totalQuestions += count;
+                        addLog(`📝 ${category}: ${count}개 문제`, 'info');
+                    }
+                    addLog(`📝 총 문제 수: ${totalQuestions}개`, 'info');
+                } else {
+                    addLog('📝 문제 데이터: 없음', 'info');
+                }
+
+                addLog('✅ 데이터 확인 완료!', 'success');
+                
+            } catch (error) {
+                addLog(`❌ 오류: ${error.message}`, 'error');
+            }
+        }
+
+        // 학생 데이터 삭제
+        async function deleteStudents() {
+            if (!confirm('⚠️ 학생 데이터를 정말 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다!')) {
+                addLog('🚫 학생 데이터 삭제 취소됨', 'info');
+                return;
+            }
+
+            addLog('🗑️ 학생 데이터 삭제 중...', 'info');
+            
+            try {
+                await database.ref('students').remove();
+                addLog('✅ 학생 데이터 삭제 완료!', 'success');
+            } catch (error) {
+                addLog(`❌ 오류: ${error.message}`, 'error');
+            }
+        }
+
+        // 문제 데이터 삭제
+        async function deleteQuestions() {
+            if (!confirm('⚠️ 문제 데이터를 정말 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다!')) {
+                addLog('🚫 문제 데이터 삭제 취소됨', 'info');
+                return;
+            }
+
+            addLog('🗑️ 문제 데이터 삭제 중...', 'info');
+            
+            try {
+                await database.ref('questions').remove();
+                addLog('✅ 문제 데이터 삭제 완료!', 'success');
+            } catch (error) {
+                addLog(`❌ 오류: ${error.message}`, 'error');
+            }
+        }
+
+        // 전체 데이터 삭제
+        async function deleteAll() {
+            const confirmText = prompt('⚠️ 전체 데이터를 삭제하려면 "DELETE"를 정확히 입력하세요:');
+            
+            if (confirmText !== 'DELETE') {
+                addLog('🚫 전체 삭제 취소됨 (확인 문구 불일치)', 'info');
+                return;
+            }
+
+            if (!confirm('⚠️⚠️⚠️ 최종 확인!\n\n정말로 모든 데이터를 삭제하시겠습니까?\n\n이 작업은 절대 되돌릴 수 없습니다!')) {
+                addLog('🚫 전체 삭제 취소됨', 'info');
+                return;
+            }
+
+            addLog('🗑️ 전체 데이터 삭제 중...', 'info');
+            
+            try {
+                await database.ref('/').remove();
+                addLog('✅ 전체 데이터 삭제 완료!', 'success');
+                addLog('📭 데이터베이스가 비어있습니다', 'success');
+            } catch (error) {
+                addLog(`❌ 오류: ${error.message}`, 'error');
+            }
+        }
+
+        // 초기 데이터 확인
+        window.onload = function() {
+            addLog('🔷 Firebase 연결 완료', 'success');
+            addLog('💡 "데이터 확인하기" 버튼을 눌러 현재 상태를 확인하세요', 'info');
+        };
+    </script>
+</body>
+</html>
